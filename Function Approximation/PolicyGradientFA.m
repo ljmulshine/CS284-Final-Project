@@ -84,6 +84,8 @@ classdef PolicyGradientFA
                 if abs(x(2,i) - 1) < 0.003
                     reward(i) = reward(i) + 100;
                 end
+                
+                reward(i) = reward(i) - norm(a,2);
             end
         end
         
