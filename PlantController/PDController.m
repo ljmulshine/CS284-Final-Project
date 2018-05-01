@@ -11,13 +11,11 @@ classdef PDController < DrakeSystem
     qdot_num
     alpha
     use_lqr % set to false as it is not linearizable
-    in_pb % in playback mode?
-    xtraj % example trajectory used for time indexing
     utraj % controller outputs to be commanded
   end
 
   methods
-    function obj = PDController(plant,Kp,Kd,cv,cd,alpha,xtraj,utraj)
+    function obj = PDController(plant,Kp,Kd,cv,cd,alpha,utraj)
         
 
         global current_target_state
@@ -41,19 +39,9 @@ classdef PDController < DrakeSystem
         % alpha = 1 --> only FB; alpha = 0 --> only FF
         obj.alpha = alpha;
         
-        obj.in_pb = 1; % in playback?
-        if exist('xtraj', 'var')
-            obj.xtraj = xtraj;
-        else
-            obj.in_pb = 0; % not in playback
-        end
-        
         if exist('utraj', 'var')
             obj.utraj = utraj;
-        else
-            obj.in_pb = 0; % not in playback
         end
-
         
         global state_targets;
     end
@@ -120,23 +108,23 @@ classdef PDController < DrakeSystem
         y = obj.updateState(t,[current_target_state; last_update_time],x);
         current_target_state = y(1);
         
-        % 
         obj.qdes = obj.getState(current_target_state,x);
         
         % PD controller output
         u = -obj.Kp*(x(1:obj.q_num)-obj.qdes(1:obj.q_num))-obj.Kd*x(obj.q_num+1:obj.q_num+obj.qdot_num);
         
-        % if we are in playback mode, command torques from the utraj provided
-%         if obj.in_pb
-            t_ind = find(obj.xtraj.tt == t);
-%             u = interp1(obj.xtraj.tt,obj.utraj,t);
-            u = obj.alpha*u + (1-obj.alpha)*obj.utraj(:,t_ind);
-%         end
-        
+        % Add in scaled feedforward inputs from utraj provided
+        t_ind = floor(t/obj.p.timestep+1);
+        u = obj.alpha*u + (1-obj.alpha)*obj.utraj(:,t_ind);
+
         % Threshold controller outputs - these limits were chosen somewhat randomly
         u = min(u,200);
         u = max(u,-200);
         
+    end
+    
+    function obj = setU(obj,utraj_new)
+        obj.utraj = utraj_new;
     end
     
     function [Kp_full,Kd] = calcK(obj,Kp,Kd)
