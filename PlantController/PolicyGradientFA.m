@@ -136,7 +136,7 @@ classdef PolicyGradientFA
         function [g, baseline] = policyGradient(obj, sigma, u_est, r, phi, baseline, T)
 
             % number of policy samples
-            N = 20;
+            N = 10;
             
             % initialize policy gradient
             g = zeros(4*obj.linearFA{1}.M,1);
