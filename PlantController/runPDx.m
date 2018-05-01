@@ -40,14 +40,22 @@ state_targets = {
   
 % construct PD controller - note that with the current set up, these
 % constants are not used and thus have no effect
-Kp = 170;
+Kp = 170; % 170 is a good value for just FB
 Kd = 2*sqrt(Kp);
-cv = 0.1;
+cv = 0.1; % 0.1 is a good value for just FB
 cd = 0;
-  
-xtraj = runPD(Kp,Kd,cv,cd,r,xtraj2,utraj2);
+alpha = .8;
+xtraj = runPD(Kp,Kd,cv,cd,r,alpha,xtraj2,utraj2);
 
-function xtraj = runPD(Kp,Kd,cv,cd,r,xtraj,utraj)
+
+% Check forwarded simulated xtraj from utraj
+xtraj_gen = [xtraj2.xx(:,1)];
+for t = 1:length(xtraj2.tt)
+    x_next = r.update(xtraj2.tt(t),xtraj_gen(:,end),-utraj2(:,t));
+    xtraj_gen = [xtraj_gen x_next];
+end
+
+function xtraj = runPD(Kp,Kd,cv,cd,r,alpha, xtraj,utraj)
 
 global state_targets;
 global current_target_state;
@@ -73,7 +81,7 @@ end
 % cv = 0.1;
 % cd = 0;
 % c = PDController(r,Kp,Kd,cv,cd);
-c = PDController(r,Kp,Kd,cv,cd,xtraj,utraj);
+c = PDController(r,Kp,Kd,cv,cd,alpha,xtraj,utraj);
 
 sys = feedback(r,c);
 
@@ -85,11 +93,11 @@ xtraj = simulate(sys,[0 3],double(x0));
 % % Find controller outputs corresonding to each time step - used to generate
 % % utraj for warm starting RL
 % current_target_state = 2;
-% u = zeros(4,length(xtraj.tt));
-% for i = 1:length(xtraj.tt)
-%     x = xtraj.xx(:,i);
-%     u(:,i) = c.output(xtraj.tt(i),0,x);
-% end
+u = zeros(4,length(xtraj.tt));
+for i = 1:length(xtraj.tt)
+    x = xtraj.xx(:,i);
+    u(:,i) = c.output(xtraj.tt(i),0,x);
+end
 
 % zf = xtraj.xx(2,end); % for debugging
 

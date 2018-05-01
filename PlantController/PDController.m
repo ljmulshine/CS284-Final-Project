@@ -9,6 +9,7 @@ classdef PDController < DrakeSystem
     qdes
     q_num
     qdot_num
+    alpha
     use_lqr % set to false as it is not linearizable
     in_pb % in playback mode?
     xtraj % example trajectory used for time indexing
@@ -16,7 +17,7 @@ classdef PDController < DrakeSystem
   end
 
   methods
-    function obj = PDController(plant,Kp,Kd,cv,cd,xtraj,utraj)
+    function obj = PDController(plant,Kp,Kd,cv,cd,alpha,xtraj,utraj)
         
 
         global current_target_state
@@ -30,13 +31,15 @@ classdef PDController < DrakeSystem
         obj.cv = cv;
         obj.cd = cd;
         
-        
         obj = obj.setInputFrame(plant.getStateFrame);
         obj = obj.setOutputFrame(plant.getInputFrame);
         
         % Set size of state space
         obj.q_num = getNumPositions(obj.p);
         obj.qdot_num = getNumVelocities(obj.p);
+        
+        % alpha = 1 --> only FB; alpha = 0 --> only FF
+        obj.alpha = alpha;
         
         obj.in_pb = 1; % in playback?
         if exist('xtraj', 'var')
@@ -107,7 +110,7 @@ classdef PDController < DrakeSystem
       
     end
 
-    function u = output(obj,t,y,x)
+    function u = output(obj,t,~,x)
         % Calculates the controller output
         
         global current_target_state
@@ -124,10 +127,11 @@ classdef PDController < DrakeSystem
         u = -obj.Kp*(x(1:obj.q_num)-obj.qdes(1:obj.q_num))-obj.Kd*x(obj.q_num+1:obj.q_num+obj.qdot_num);
         
         % if we are in playback mode, command torques from the utraj provided
-        if obj.in_pb
+%         if obj.in_pb
             t_ind = find(obj.xtraj.tt == t);
-            u = obj.utraj(:,t_ind);
-        end
+%             u = interp1(obj.xtraj.tt,obj.utraj,t);
+            u = obj.alpha*u + (1-obj.alpha)*obj.utraj(:,t_ind);
+%         end
         
         % Threshold controller outputs - these limits were chosen somewhat randomly
         u = min(u,200);
