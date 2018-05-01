@@ -99,7 +99,7 @@ state_targets = {
         [0; straight_knee; kick_ankle; max_hip_angle/2 - torso_lean; straight_knee; kick_ankle],... % right kick back
       };
 
-explorationFactor = 100;
+explorationFactor = 10;
 sigma = explorationFactor*eye(length(u(:,1)));
 % 
 % % Evaluate fisher information matrix 
@@ -109,7 +109,7 @@ sigma = explorationFactor*eye(length(u(:,1)));
 
 %% Run RL 
 
-nepisodes = 5;
+nepisodes = 20;
 
 % Initialize basis functions
 for k = 1:T
@@ -144,7 +144,7 @@ for k = 1:nepisodes
 
     % Display norm of difference between current approximator and previous
     % controller estimate
-    fprintf('%d', norm(u_est' - controls.approximator'));
+    fprintf('Trajectory Deviation: %d\n', norm(u_est' - controls.approximator'));
 
     % update expected control input based on updated policy
     u_est = controls.approximator;

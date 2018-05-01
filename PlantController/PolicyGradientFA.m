@@ -136,7 +136,7 @@ classdef PolicyGradientFA
         function [g, baseline] = policyGradient(obj, sigma, u_est, r, phi, baseline, T)
 
             % number of policy samples
-            N = 5;
+            N = 20;
             
             % initialize policy gradient
             g = zeros(4*obj.linearFA{1}.M,1);
@@ -171,27 +171,33 @@ classdef PolicyGradientFA
                 sampled_traj(:,:,i) = xtraj.eval(linspace(0,2,T));
                 traj = sampled_traj(:,:,i);
                 
-                figure(2)
-                plot(traj(2,:));
-                title('Base Height');
-                
-                % Evaluate "return" from sampled trajectory
-                R(:,i) = obj.R_t(traj);
-                
-                % Evaluate advantage function at each point in time
-                A = R(:,i) - baseline;
-                
-                % Calculate policy gradient at each time step
-                for t = 1:T
-                    
-                    w = [obj.linearFA{1}.weights; 
-                         obj.linearFA{2}.weights; 
-                         obj.linearFA{3}.weights; 
-                         obj.linearFA{4}.weights];
-                     
-                    % evaluate policy gradient
-                    g(:,t, i) = phi(:,:,t)' * iS * (u_sampled(:,t) - phi(:,:,t) * w).*A(t);
+                if (min(traj(2,:)) > 0.95)
+
+                    figure(2)
+                    plot(traj(2,:));
+                    title('Base Height');
+
+                    % Evaluate "return" from sampled trajectory
+                    R(:,i) = obj.R_t(traj);
+
+                    % Evaluate advantage function at each point in time
+                    A = R(:,i) - baseline;
+
+                    % Calculate policy gradient at each time step
+                    for t = 1:T
+
+                        w = [obj.linearFA{1}.weights; 
+                             obj.linearFA{2}.weights; 
+                             obj.linearFA{3}.weights; 
+                             obj.linearFA{4}.weights];
+
+                        % evaluate policy gradient
+                        g(:,t, i) = phi(:,:,t)' * iS * (u_sampled(:,t) - phi(:,:,t) * w).*A(t);
+                    end
+                else
+                    g(:,t, i) = zeros(1,4 * obj.linearFA{1}.M);
                 end
+                    
             end
           
             % Evaluate new baseline reward
@@ -209,7 +215,7 @@ classdef PolicyGradientFA
         
         % Update the policy based on policy gradient in current iteration
         function obj = updatePolicy(obj, g)
-            alpha = 0.1;
+            alpha = 0.5;
             % update FA parameters based on policy gradient
             del = reshape(alpha * g, 2001, 4);
             for i = 1:obj.nactions
