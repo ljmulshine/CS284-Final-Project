@@ -19,7 +19,7 @@ classdef RadialBasisFunctionApproximator
         obj.nstate_vars = nactions;
         obj.M = M;
         obj.ncenters = length(obj.centers(1,:));
-        obj.width = repmat(1, 1, obj.ncenters);
+        obj.width = repmat(200, 1, obj.ncenters);
     end
     
     % Compute the feature vector for a given state.

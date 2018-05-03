@@ -126,7 +126,7 @@ classdef PDController < DrakeSystem
         feedforward_controller = obj.utraj(states(:,t_ind));
         Sigma = obj.sigma^2*eye(4);
         actions(:,t_ind) = mvnrnd(feedforward_controller, Sigma);
-        
+
         % Add in scaled feedforward inputs from utraj provided
         u = obj.alpha*u + (1-obj.alpha)*actions(:,t_ind);
 

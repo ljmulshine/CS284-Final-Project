@@ -1,44 +1,59 @@
 clear
 close all 
-
-% load trajectory data
-load('xtraj2.mat');
-load('utraj2.mat');
-
-
+% 
+% % load trajectory data
+% load('xtraj2.mat');
+% load('utraj2.mat');
+% 
+ 
 T = 2001; 
-% Extract trajectories and control inputs
-xtraj = xtraj2.eval(xtraj2.tt);
-xtraj = xtraj(:,1:T);
-u = utraj2(:,1:T);
+states = 1:14;
+% % Extract trajectories and control inputs
+% xtraj = xtraj2.eval(xtraj2.tt);
+% xtraj = xtraj(:,1:T);
+% u = utraj2(:,1:T);
 
-u_diff = diff(u');
+load('good_xtrajs.mat');
+load('good_utrajs.mat');
 
+
+good_xtrajs = good_xtrajs(:,:,75); 
+good_utrajs = good_utrajs(:,:,75); 
+
+num_trajs = length(good_utrajs(1,1,:));
+
+xtraj = sum(good_xtrajs, 3) ./ num_trajs; 
+utraj = sum(good_utrajs, 3) ./ num_trajs;
+
+xtraj_training = reshape(good_xtrajs, 14, 2001 * num_trajs);
+utraj_training = reshape(good_utrajs, 4, 2001 * num_trajs);
+
+u_diff = diff(utraj');
 figure()
 plot(u_diff);
 
 
 %  Define indices of centers used for RBF approximation
-t = [1:1:50, 51:1:110, ... 
-     111:3:170, 171:3:200,...
-     201:3:225, 226:3:475,...
-     476:3:650, 651:3:910, ...
-     911:3:1000, 1001:1:1320, ...
-     1321:3:1360, 1361:1:1415, ...
-     1416:2:1440, 1441:2:1811, ...
-     1812:1:1930, 1931:1:2001 ];
+t = [1:4:50, 51:10:110, ... 
+     111:4:170, 171:10:200,...
+     201:4:225, 226:10:475,...
+     476:4:650, 651:10:910, ...
+     911:4:1000, 1001:10:1320, ...
+     1321:4:1360, 1361:10:1415, ...
+     1416:4:1440, 1441:10:1811, ...
+     1812:4:1930, 1931:10:2001 ];
 
 % Define the centers used for RBF approximation
-centers = xtraj(:,t);
+centers = xtraj(states,t);
 
 % Plot centers (overlay centers with original trajectory)
 figure()
 plot(t, centers');
 hold on
-plot(1:T, xtraj');
+plot(1:T, xtraj(states,:)');
 
 % Number of basis functions
-nbasis_functions = length(centers);
+nbasis_functions = length(t);
 % Number of actuators/actions
 nactions = 4;
 
@@ -46,17 +61,17 @@ nactions = 4;
 policyRBF = PolicyGradientFA(nactions, centers, nbasis_functions);
 
 % Fit radial basis functions to initial trajectory
-policyRBF = policyRBF.fitFA(xtraj, u);
+policyRBF = policyRBF.fitFA(xtraj_training(states,:), utraj_training);
 
 for i = 1:T
-    u_est(:,i) = policyRBF.evaluate(xtraj(:,i));
+    u_est(:,i) = policyRBF.evaluate(xtraj(states,i));
 end
 
 figure()
 plot(u_est');
 
 % Approximation error
-error = (u - u_est);
+error = (utraj - u_est);
 rbfFA_error = norm(error, 2);
 fprintf("\nRadial Basis Function Approximation Error: %2.5f\n", rbfFA_error); 
 
@@ -65,7 +80,7 @@ f = figure();
 for i = 1:4
     plot(u_est(i,:), '.');
     hold on
-    plot(u(i,:));
+    plot(utraj(i,:));
 end
 title('Initial Policy Estimate');
 xlabel('Time Step');
@@ -129,47 +144,42 @@ state_targets = {
       };
 
 explorationFactor = 10000;
-sigma = explorationFactor*eye(length(u(:,1)));
+sigma = explorationFactor*eye(length(u_est(:,1)));
 % 
 % % Evaluate fisher information matrix 
 % F = policyRBF.fisherInformation(policyRBF.linearFA{1}.phi, sigma);
 % F = F + eye(length(F(1,:))); % ensure F is well-conditioned
 
-
-alpha = 0.99;
+alpha = 0.90;
 nepisodes = 500;
 reward = zeros(1,nepisodes);
+baseline = zeros(1,T);
 
 %% Run RL 
-
-baseline = zeros(1,T);
 
 for k = 1:nepisodes
     
     alpha = alpha - 0.5*1/nepisodes;
-
+    
     % Estimate policy gradient
     [policyGradient, baseline, reward(k)] = policyRBF.policyGradient(sigma, u_est, r, baseline, T, alpha);
 
     % Update policy based on policy gradient estimate
     policyRBF = policyRBF.updatePolicy(policyGradient);
 
-    % Determine which sequence of states we should use to evaluate the policy.
-    % This sequence changes the value of the basis functions at each time step 
-    controls = policyRBF.approximate(t);
-    
     % Plot approximator and previous control input
     f = figure(1);
     plot(u_est')
-    hold on
-    plot(controls.approximator', '.')
-    plot(u_est' - controls.approximator')
-    hold off
-
+    for i = 1:T
+        u_est_new(:,i) = policyRBF.evaluate(xtraj(states,i));
+    end
+    hold on 
+    plot(u_est_new');
+   
     % Display norm of difference between current approximator and previous
     % controller estimate
-    fprintf('Trajectory Deviation: %d\n', norm(u_est' - controls.approximator'));
+    fprintf('Trajectory Deviation: %d\n', norm(u_est' - u_est_new'));
 
     % update expected control input based on updated policy
-    u_est = controls.approximator;
+    u_est = u_est_new;
 end
