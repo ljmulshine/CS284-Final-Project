@@ -17,8 +17,8 @@ load('good_xtrajs.mat');
 load('good_utrajs.mat');
 
 
-good_xtrajs = good_xtrajs(:,:,75); 
-good_utrajs = good_utrajs(:,:,75); 
+good_xtrajs = good_xtrajs(:,:,150); 
+good_utrajs = good_utrajs(:,:,150); 
 
 num_trajs = length(good_utrajs(1,1,:));
 
@@ -143,8 +143,6 @@ state_targets = {
         [0; straight_knee; kick_ankle; max_hip_angle/2 - torso_lean; straight_knee; kick_ankle],... % right kick back
       };
 
-explorationFactor = 10000;
-sigma = explorationFactor*eye(length(u_est(:,1)));
 % 
 % % Evaluate fisher information matrix 
 % F = policyRBF.fisherInformation(policyRBF.linearFA{1}.phi, sigma);
@@ -157,6 +155,13 @@ baseline = zeros(1,T);
 
 %% Run RL 
 
+global prev_action_norm;
+
+prev_action_norm = zeros(1,T);
+
+for i = 1:T
+    prev_action_norm(i) = norm(u_est(:,i));
+end
 for k = 1:nepisodes
     
     alpha = alpha - 0.5*1/nepisodes;

@@ -75,26 +75,14 @@ classdef PolicyGradientFA
         end
 
         function reward = reward(obj, x, a)
+            
+            global prev_action_norm
+            
             reward = zeros(1,length(x(1,:)));
             for i = 1:length(x(1,:))
-                
-                if abs(x(2,i) - 1) < 0.005
-                    reward(i) = reward(i) + 1000;
-                end
-                if abs(x(2,i) - 1) < 0.05
-                    reward(i) = reward(i) + 100;
-                end
-                if abs(x(2,i) - 1) < 0.1
-                    reward(i) = reward(i) + 10;
-                end
-                if abs(x(2,i) - 1) < 0.25
-                    reward(i) = reward(i) + 1;
-                end
-                
-                if (abs(x(2,i) - 1) > 0.25)
-                    reward(i) = reward(i) - 1000;
-                end
-                
+                reward(i) = reward(i) + -20000*(x(2,i)-1).^2 + 100;
+                reward(i) = reward(i) + (prev_action_norm(i) - norm(a(:,i)));
+                prev_action_norm(i) = norm(a(:,i));
             end
         end
         
@@ -133,7 +121,7 @@ classdef PolicyGradientFA
             actions = zeros(4, T);
             
             % Number of policy samples
-            N = 15;
+            N = 20;
             
             % Initialize policy gradient
             g = zeros(4*obj.linearFA{1}.M,1);
@@ -151,7 +139,7 @@ classdef PolicyGradientFA
             Kd = 2*sqrt(Kp);
             cv = 0.1; % 0.1 is a good value for just FB
             cd = 0;                
-            sigma = 0.01;
+            sigma = 1;
             
             % Iterate over a number of policy samples to more accurately
             % estimate policy gradient
