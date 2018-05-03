@@ -17,8 +17,8 @@ load('good_xtrajs.mat');
 load('good_utrajs.mat');
 
 
-good_xtrajs = good_xtrajs(:,:,150); 
-good_utrajs = good_utrajs(:,:,150); 
+good_xtrajs = good_xtrajs(:,:,1:150); 
+good_utrajs = good_utrajs(:,:,1:150); 
 
 num_trajs = length(good_utrajs(1,1,:));
 

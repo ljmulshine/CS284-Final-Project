@@ -36,11 +36,11 @@ function xtraj = runPDx(Kp,Kd,cv,cd,r,alpha, utraj, sigma)
     % % Find controller outputs corresonding to each time step - used to generate
     % % utraj for warm starting RL
     % current_target_state = 2;
-    u = zeros(4,length(xtraj.tt));
-    for i = 1:length(xtraj.tt)
-        x = xtraj.xx(:,i);
-        u(:,i) = c.output(xtraj.tt(i),0,x);
-    end
+%     u = zeros(4,length(xtraj.tt));
+%     for i = 1:length(xtraj.tt)
+%         x = xtraj.xx(:,i);
+%         u(:,i) = c.output(xtraj.tt(i),0,x);
+%     end
 
     % zf = xtraj.xx(2,end); % for debugging
 

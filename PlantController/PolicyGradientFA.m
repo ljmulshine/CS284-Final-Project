@@ -80,8 +80,9 @@ classdef PolicyGradientFA
             
             reward = zeros(1,length(x(1,:)));
             for i = 1:length(x(1,:))
-                reward(i) = reward(i) + -20000*(x(2,i)-1).^2 + 100;
-                reward(i) = reward(i) + (prev_action_norm(i) - norm(a(:,i)));
+                reward(i) = reward(i) + -100*(x(2,i)-1).^2 + 2;
+                reward(i) = reward(i) + (1 - norm(a(:,i)) / prev_action_norm(i));
+                reward(i) = max(-2, reward(i));
                 prev_action_norm(i) = norm(a(:,i));
             end
         end
@@ -94,7 +95,7 @@ classdef PolicyGradientFA
                 reward(i) = obj.reward(x(:,i), policy(:,i));
             end
 
-            gamma = 0.99;
+            gamma = 0.9999;
             % Evaluate value function at each state along the trajectory
             for i = 1:N
                 for j = (i + 1):N
@@ -125,9 +126,7 @@ classdef PolicyGradientFA
             
             % Initialize policy gradient
             g = zeros(4*obj.linearFA{1}.M,1);
-                      
-
-            
+                     
             % Allocate space for trajectory and policies
             sampled_policy = zeros(4,T,N);
             sampled_traj = zeros(14,T,N);           
@@ -165,10 +164,11 @@ classdef PolicyGradientFA
 
                 % Evaluate "return" from sampled trajectory
                 R(:,i) = obj.R_t(traj, policy);
-
+                
+                fprintf("\nCurrent trajectory's reward: %f\n", R(1,i));
                 % Evaluate advantage function at each point in time
                 A = R(:,i) - baseline;
-
+                
                 M = obj.linearFA{1}.M;
                 % Calculate policy gradient at each time step
                 for t = 1:T
@@ -179,7 +179,8 @@ classdef PolicyGradientFA
 
                     % Evaluate policy gradient
                     g(:,t, i) = phi' * iS * (actions(:,t) - obj.evaluate(traj(:,t))).*A(t);
-                end               
+                end 
+                
             end
             
             % Evaluate new baseline reward
@@ -196,7 +197,7 @@ classdef PolicyGradientFA
         
         % Update the policy based on policy gradient in current iteration
         function obj = updatePolicy(obj, g)
-            alpha = 0.001;
+            alpha = 0.0005;
             % update FA parameters based on policy gradient
             del = reshape(alpha * g, obj.linearFA{1}.M, 4);
             for i = 1:obj.nactions
