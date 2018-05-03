@@ -12,10 +12,11 @@ classdef PDController < DrakeSystem
     alpha
     use_lqr % set to false as it is not linearizable
     utraj % controller outputs to be commanded
+    sigma
   end
 
   methods
-    function obj = PDController(plant,Kp,Kd,cv,cd,alpha,utraj)
+    function obj = PDController(plant,Kp,Kd,cv,cd,alpha,utraj, sigma)
         
 
         global current_target_state
@@ -35,9 +36,10 @@ classdef PDController < DrakeSystem
         % Set size of state space
         obj.q_num = getNumPositions(obj.p);
         obj.qdot_num = getNumVelocities(obj.p);
-        
+
         % alpha = 1 --> only FB; alpha = 0 --> only FF
         obj.alpha = alpha;
+        obj.sigma = sigma;
         
         if exist('utraj', 'var')
             obj.utraj = utraj;
@@ -103,6 +105,8 @@ classdef PDController < DrakeSystem
         
         global current_target_state
         global last_update_time
+        global states
+        global actions
         
         % Update target pose if necessary
         y = obj.updateState(t,[current_target_state; last_update_time],x);
@@ -113,14 +117,22 @@ classdef PDController < DrakeSystem
         % PD controller output
         u = -obj.Kp*(x(1:obj.q_num)-obj.qdes(1:obj.q_num))-obj.Kd*x(obj.q_num+1:obj.q_num+obj.qdot_num);
         
-        % Add in scaled feedforward inputs from utraj provided
+        % Determine time index
         t_ind = floor(t/obj.p.timestep+1);
-        u = obj.alpha*u + (1-obj.alpha)*obj.utraj(:,t_ind);
+        
+        % Evaluate feedforward control inputs based on current state -
+        % update global variables
+        states(:,t_ind) = [reshape(x(1:obj.q_num), 7, 1); reshape(x(obj.q_num+1:obj.q_num+obj.qdot_num), 7, 1)];
+        feedforward_controller = obj.utraj(states(:,t_ind));
+        Sigma = obj.sigma^2*eye(4);
+        actions(:,t_ind) = mvnrnd(feedforward_controller, Sigma);
+        
+        % Add in scaled feedforward inputs from utraj provided
+        u = obj.alpha*u + (1-obj.alpha)*actions(:,t_ind);
 
         % Threshold controller outputs - these limits were chosen somewhat randomly
         u = min(u,200);
         u = max(u,-200);
-        
     end
     
     function obj = setU(obj,utraj_new)

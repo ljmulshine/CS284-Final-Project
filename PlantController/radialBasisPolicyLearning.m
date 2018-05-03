@@ -5,26 +5,55 @@ close all
 load('xtraj2.mat');
 load('utraj2.mat');
 
+
+T = 2001; 
 % Extract trajectories and control inputs
 xtraj = xtraj2.eval(xtraj2.tt);
-utraj = utraj2;
+xtraj = xtraj(:,1:T);
+u = utraj2(:,1:T);
 
-% redefine state variables
-x = xtraj(:,1:1:2001);
-T = length(x(1,:));
-t = 1:T;
-u = utraj(:,1:1:2001);
-c = x;
-M = length(x(1,:));
-a = ones(1,M);
+u_diff = diff(u');
+
+figure()
+plot(u_diff);
+
+
+%  Define indices of centers used for RBF approximation
+t = [1:1:50, 51:1:110, ... 
+     111:3:170, 171:3:200,...
+     201:3:225, 226:3:475,...
+     476:3:650, 651:3:910, ...
+     911:3:1000, 1001:1:1320, ...
+     1321:3:1360, 1361:1:1415, ...
+     1416:2:1440, 1441:2:1811, ...
+     1812:1:1930, 1931:1:2001 ];
+
+% Define the centers used for RBF approximation
+centers = xtraj(:,t);
+
+% Plot centers (overlay centers with original trajectory)
+figure()
+plot(t, centers');
+hold on
+plot(1:T, xtraj');
+
+% Number of basis functions
+nbasis_functions = length(centers);
+% Number of actuators/actions
+nactions = 4;
 
 % Get radial basis function approximation
-policyRBF = PolicyGradientFA(0, 0, 0, 0, 4, t, length(t));
+policyRBF = PolicyGradientFA(nactions, centers, nbasis_functions);
 
-% Fit data to radial basis - this function updates the FA weights
-policyRBF = policyRBF.fitFA(x, u, t);
-policyRBF = policyRBF.approximate(t);
-u_est = policyRBF.approximator; 
+% Fit radial basis functions to initial trajectory
+policyRBF = policyRBF.fitFA(xtraj, u);
+
+for i = 1:T
+    u_est(:,i) = policyRBF.evaluate(xtraj(:,i));
+end
+
+figure()
+plot(u_est');
 
 % Approximation error
 error = (u - u_est);
@@ -99,7 +128,7 @@ state_targets = {
         [0; straight_knee; kick_ankle; max_hip_angle/2 - torso_lean; straight_knee; kick_ankle],... % right kick back
       };
 
-explorationFactor = 10;
+explorationFactor = 10000;
 sigma = explorationFactor*eye(length(u(:,1)));
 % 
 % % Evaluate fisher information matrix 
@@ -107,24 +136,20 @@ sigma = explorationFactor*eye(length(u(:,1)));
 % F = F + eye(length(F(1,:))); % ensure F is well-conditioned
 
 
+alpha = 0.99;
+nepisodes = 500;
+reward = zeros(1,nepisodes);
+
 %% Run RL 
-
-nepisodes = 20;
-
-% Initialize basis functions
-for k = 1:T
-    phi(:,:,k) = [policyRBF.linearFA{1}.phi(k,:), zeros(1,3*policyRBF.linearFA{1}.M);
-               zeros(1,policyRBF.linearFA{2}.M), policyRBF.linearFA{2}.phi(k,:), zeros(1,2*policyRBF.linearFA{2}.M);
-               zeros(1,2*policyRBF.linearFA{3}.M), policyRBF.linearFA{3}.phi(k,:), zeros(1,policyRBF.linearFA{3}.M);
-               zeros(1,3*policyRBF.linearFA{4}.M), policyRBF.linearFA{4}.phi(k,:)];
-end
 
 baseline = zeros(1,T);
 
 for k = 1:nepisodes
+    
+    alpha = alpha - 0.5*1/nepisodes;
 
     % Estimate policy gradient
-    [policyGradient, baseline] = policyRBF.policyGradient(sigma, u_est, r, phi, baseline, T);
+    [policyGradient, baseline, reward(k)] = policyRBF.policyGradient(sigma, u_est, r, baseline, T, alpha);
 
     % Update policy based on policy gradient estimate
     policyRBF = policyRBF.updatePolicy(policyGradient);
@@ -139,7 +164,6 @@ for k = 1:nepisodes
     hold on
     plot(controls.approximator', '.')
     plot(u_est' - controls.approximator')
-    saveas(f, 'policy10.png');
     hold off
 
     % Display norm of difference between current approximator and previous

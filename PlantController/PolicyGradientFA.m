@@ -9,38 +9,36 @@ classdef PolicyGradientFA
     end
     
     methods
-        function obj = PolicyGradientFA(num_states, state_lb, state_ub, fa_order, nactions, c, M)
+        function obj = PolicyGradientFA(nactions, centers, M)
             obj.nactions = nactions;
             obj.linearFA = {};
-            if (state_lb == 0)
-                % Radial Basis Function Approximation
-                for j=1:nactions
-                   obj.linearFA{j} = RadialBasisFunctionApproximator(num_states, c, M); % copy one set of BFs for each discrete action
-                end
-            else
-                % Fourier Basis Function Approximation
-                for j=1:nactions
-                  obj.linearFA{j} = FourierPolicyApproximator(num_states, state_lb, state_ub, fa_order); % copy one set of BFs for each discrete action
-                end
-            end    
-            
+            % Radial Basis Function Approximation
+            for j=1:nactions
+               obj.linearFA{j} = RadialBasisFunctionApproximator(nactions, centers, M); % copy one set of BFs for each discrete action
+            end   
         end
             
         % Fit the function approximator to trajectory (x, u)
         function obj = fitFA(obj, x, u, t)
-
             % Compute basis features for each state along the trajectory
             for i = 1:obj.nactions
-                features = obj.linearFA{i}.getBasisFunctions(t);
+                features = obj.linearFA{i}.getBasisFunctions(x);
                 obj.linearFA{i}.phi = features;
                 
                 % Compute optimal weights 
-                w = lsqlin(features, u(i,:));
+                w = lsqlin(obj.linearFA{i}.phi, u(i,:));
 
                 % set weights
                 obj.linearFA{i}.weights = w;
             end
-
+        end
+        
+        
+        % Evaluate function approximator at state x
+        function u = evaluate(obj, s)
+            for i = 1:obj.nactions
+                u(i,1) = obj.linearFA{i}.computeFeatures(s) * obj.linearFA{i}.weights;
+            end
         end
 
         % Approximate function given input state vector (trajectory), x
@@ -80,52 +78,44 @@ classdef PolicyGradientFA
             reward = zeros(1,length(x(1,:)));
             for i = 1:length(x(1,:))
                 
-                if abs(x(2,i) - 1) < 0.003
+                if abs(x(2,i) - 1) < 0.005
+                    reward(i) = reward(i) + 1000;
+                end
+                if abs(x(2,i) - 1) < 0.05
                     reward(i) = reward(i) + 100;
                 end
                 if abs(x(2,i) - 1) < 0.1
                     reward(i) = reward(i) + 10;
                 end
-                if abs(x(2,i) - 1) < 0.2
+                if abs(x(2,i) - 1) < 0.25
                     reward(i) = reward(i) + 1;
                 end
-                if abs(x(2,i) - 1) < 0.25
-                    reward(i) = reward(i) + 0.5;
+                
+                if (abs(x(2,i) - 1) > 0.25)
+                    reward(i) = reward(i) - 1000;
                 end
                 
             end
         end
         
-        
-        function R_t = R_t(obj, x)
+        function R_t = R_t(obj, x, policy)
             % Evaluate reward at each point along trajectory of length N
             N = length(x(1,:));
             for i = 1:N
-                % Get action at state s according to current policy
-                actions = zeros(1,obj.nactions);
-                for j = 1:obj.nactions
-                    actions(j) = obj.linearFA{j}.valueAt(x(:,i));
-                end
-                
                 % Calculate reward given current state and action
-                reward(i) = obj.reward(x(:,i), actions);
+                reward(i) = obj.reward(x(:,i), policy(:,i));
             end
 
+            gamma = 0.99;
             % Evaluate value function at each state along the trajectory
             for i = 1:N
-                R_t(i) = sum(reward(i:end));
+                for j = (i + 1):N
+                    rw(j-i) = gamma^(j - i - 1) * reward(j);
+                end
+                R_t(i) = sum(rw(1:(end - i + 1)));
             end
         end
 
-        function Q = actionValueFunction(obj, s, a)
-            % evaluate action value function (Q) at state s given action, a
-            Q = 2;
-        end
-
-        function A = advantageFunction(obj, s, a)
-            % evaluate advantage of taking action, a, in state, s
-            A = obj.actionValueFunction(s,a) - obj.valueFunction(s);
-        end
 
         %  Evaluate the policy gradient of the given function approximator
         %  @param   psi     set of basis functions evaluate for all time, T
@@ -133,19 +123,25 @@ classdef PolicyGradientFA
         %  @param   u_est   most recent policy estimate
         %  @param   w       policy approximator weights
         %  @param   s       trajectory
-        function [g, baseline] = policyGradient(obj, sigma, u_est, r, phi, baseline, T)
-
-            % number of policy samples
-            N = 10;
+        function [g, baseline, reward] = policyGradient(obj, sigma, u_est, r, baseline, T, alpha)
             
-            % initialize policy gradient
+            global states
+            global actions
+            
+            % Allocate space for states and actions along trajectory
+            states = zeros(14, T);
+            actions = zeros(4, T);
+            
+            % Number of policy samples
+            N = 15;
+            
+            % Initialize policy gradient
             g = zeros(4*obj.linearFA{1}.M,1);
-            
-            
-            % inverse covariance
+                      
+            % Calculate inverse covariance
             iS = inv(sigma);
             
-            % allocate space for trajectory and policies
+            % Allocate space for trajectory and policies
             sampled_policy = zeros(4,T,N);
             sampled_traj = zeros(14,T,N);           
               
@@ -154,70 +150,65 @@ classdef PolicyGradientFA
             Kp = 170; % 170 is a good value for just FB
             Kd = 2*sqrt(Kp);
             cv = 0.1; % 0.1 is a good value for just FB
-            cd = 0;
-            alpha = 0.9;
+            cd = 0;                
+            sigma = 0.01;
             
             % Iterate over a number of policy samples to more accurately
             % estimate policy gradient
             for i = 1:N
-                % construct sample policy
-                for t = 1:T
-                    sampled_policy(:,t,i) = obj.samplePolicy(u_est(:,t), sigma)';
-                end
-                u_sampled = sampled_policy(:,:,i);
-                
                 % Simulate policy and get trajectory
-                xtraj = runPDx(Kp,Kd,cv,cd,r,alpha,u_sampled);
-                sampled_traj(:,:,i) = xtraj.eval(linspace(0,2,T));
-                traj = sampled_traj(:,:,i);
+                runPDx(Kp,Kd,cv,cd,r,alpha,@obj.evaluate, sigma);
+               
+                % Update states and actions for current policy sample
+                sampled_traj(:,:,i) = states;
+                sampled_policy(:,:,i) = actions;
+                traj = states;
+                policy = actions;
                 
-                if (min(traj(2,:)) > 0.95)
+                figure(3) 
+                plot(policy');
+                
+                % Plot base height over time - demonstrates policy
+                figure(2)
+                plot(traj(2,:));
+                title('Base Height');
 
-                    figure(2)
-                    plot(traj(2,:));
-                    title('Base Height');
+                % Evaluate "return" from sampled trajectory
+                R(:,i) = obj.R_t(traj, policy);
 
-                    % Evaluate "return" from sampled trajectory
-                    R(:,i) = obj.R_t(traj);
+                % Evaluate advantage function at each point in time
+                A = R(:,i) - baseline;
 
-                    % Evaluate advantage function at each point in time
-                    A = R(:,i) - baseline;
+                M = obj.linearFA{1}.M;
+                % Calculate policy gradient at each time step
+                for t = 1:T
+                    phi = [ obj.linearFA{1}.computeFeatures(traj(:,t)), zeros(1,M), zeros(1,M), zeros(1,M);
+                            zeros(1,M), obj.linearFA{2}.computeFeatures(traj(:,t)), zeros(1,M), zeros(1,M);
+                            zeros(1,M), zeros(1,M), obj.linearFA{3}.computeFeatures(traj(:,t)), zeros(1,M);
+                            zeros(1,M), zeros(1,M), zeros(1,M), obj.linearFA{4}.computeFeatures(traj(:,t)) ];
 
-                    % Calculate policy gradient at each time step
-                    for t = 1:T
-
-                        w = [obj.linearFA{1}.weights; 
-                             obj.linearFA{2}.weights; 
-                             obj.linearFA{3}.weights; 
-                             obj.linearFA{4}.weights];
-
-                        % evaluate policy gradient
-                        g(:,t, i) = phi(:,:,t)' * iS * (u_sampled(:,t) - phi(:,:,t) * w).*A(t);
-                    end
-                else
-                    g(:,t, i) = zeros(1,4 * obj.linearFA{1}.M);
-                end
-                    
+                    % Evaluate policy gradient
+                    g(:,t, i) = phi' * iS * (actions(:,t) - obj.evaluate(traj(:,t))).*A(t);
+                end               
             end
-          
-            % Evaluate new baseline reward
-            baseline = sum(R,2) / N;
             
+            % Evaluate new baseline reward
+            beta = 0.5;
+            baseline = beta * baseline + (1 - beta) * sum(R,2) / N;
+            
+            % Evaluate total reward
+            reward = sum(R(1,:)) / N;
+            
+            fprintf("Reward: %f", reward);
             % Average over N samples
             g = (1/(N*T))*sum(sum(g,2),3);
-        end
-        
-        % Return fisher information matrix for parameterized stochastic
-        % policy, pi
-        function F = fisherInformation(obj, psi, sigma)
-            F = psi'* inv(sigma) * psi;
         end
         
         % Update the policy based on policy gradient in current iteration
         function obj = updatePolicy(obj, g)
             alpha = 0.5;
             % update FA parameters based on policy gradient
-            del = reshape(alpha * g, 2001, 4);
+            del = reshape(alpha * g, obj.linearFA{1}.M, 4);
             for i = 1:obj.nactions
                 obj.linearFA{i}.weights = obj.linearFA{i}.weights + del(:,i);
             end

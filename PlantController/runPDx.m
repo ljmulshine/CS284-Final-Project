@@ -1,4 +1,4 @@
-function xtraj = runPDx(Kp,Kd,cv,cd,r,alpha, utraj)
+function xtraj = runPDx(Kp,Kd,cv,cd,r,alpha, utraj, sigma)
 
     global state_targets;
     global current_target_state;
@@ -24,7 +24,7 @@ function xtraj = runPDx(Kp,Kd,cv,cd,r,alpha, utraj)
     % cv = 0.1;
     % cd = 0;
     % c = PDController(r,Kp,Kd,cv,cd);
-    c = PDController(r,Kp,Kd,cv,cd,alpha,utraj);
+    c = PDController(r,Kp,Kd,cv,cd,alpha,utraj, sigma);
 
     sys = feedback(r,c);
 
