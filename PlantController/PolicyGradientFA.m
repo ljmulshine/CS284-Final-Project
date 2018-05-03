@@ -111,7 +111,7 @@ classdef PolicyGradientFA
         %  @param   u_est   most recent policy estimate
         %  @param   w       policy approximator weights
         %  @param   s       trajectory
-        function [g, baseline, reward] = policyGradient(obj, sigma, u_est, r, baseline, T, alpha)
+        function [g, baseline, reward] = policyGradient(obj, u_est, r, baseline, T, alpha)
             
             global states
             global actions
@@ -126,8 +126,7 @@ classdef PolicyGradientFA
             % Initialize policy gradient
             g = zeros(4*obj.linearFA{1}.M,1);
                       
-            % Calculate inverse covariance
-            iS = inv(sigma);
+
             
             % Allocate space for trajectory and policies
             sampled_policy = zeros(4,T,N);
@@ -139,7 +138,10 @@ classdef PolicyGradientFA
             Kd = 2*sqrt(Kp);
             cv = 0.1; % 0.1 is a good value for just FB
             cd = 0;                
-            sigma = 1;
+            xFactor = 1;
+            sigma = xFactor * eye(4);
+            % Calculate inverse covariance
+            iS = inv(sigma);
             
             % Iterate over a number of policy samples to more accurately
             % estimate policy gradient
@@ -194,7 +196,7 @@ classdef PolicyGradientFA
         
         % Update the policy based on policy gradient in current iteration
         function obj = updatePolicy(obj, g)
-            alpha = 0.5;
+            alpha = 0.001;
             % update FA parameters based on policy gradient
             del = reshape(alpha * g, obj.linearFA{1}.M, 4);
             for i = 1:obj.nactions

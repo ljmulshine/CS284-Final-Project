@@ -167,7 +167,7 @@ for k = 1:nepisodes
     alpha = alpha - 0.5*1/nepisodes;
     
     % Estimate policy gradient
-    [policyGradient, baseline, reward(k)] = policyRBF.policyGradient(sigma, u_est, r, baseline, T, alpha);
+    [policyGradient, baseline, reward(k)] = policyRBF.policyGradient(u_est, r, baseline, T, alpha);
 
     % Update policy based on policy gradient estimate
     policyRBF = policyRBF.updatePolicy(policyGradient);
