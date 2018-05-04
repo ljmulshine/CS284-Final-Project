@@ -1,7 +1,5 @@
 classdef PolicyGradientFA
-    % Learn optimal policy through RL on function approximator using
-    % policy gradietns
-    
+    % This class contains functions empoyed by the policy gradient iteration
     properties
         linearFA
         approximator
@@ -9,6 +7,7 @@ classdef PolicyGradientFA
     end
     
     methods
+        % Policy gradient object constructor
         function obj = PolicyGradientFA(nactions, centers, M)
             obj.nactions = nactions;
             obj.linearFA = {};
@@ -122,14 +121,14 @@ classdef PolicyGradientFA
                 traj = states;
                 policy = actions;
                 
-                % Display the current policy
-                figure(3) 
-                plot(policy');
+%                 % Display the current policy
+%                 figure(3) 
+%                 plot(policy');
                 
-                % Plot base height over time - demonstrates policy
-                figure(2)
-                plot(traj(2,:));
-                title('Base Height');
+%                 % Plot base height over time - demonstrates policy
+%                 figure(2)
+%                 plot(traj(2,:));
+%                 title('Base Height');
 
                 % Evaluate "return" from sampled trajectory
                 R(:,i) = obj.R_t(traj, policy);

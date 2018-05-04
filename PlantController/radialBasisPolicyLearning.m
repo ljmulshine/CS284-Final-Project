@@ -1,4 +1,6 @@
 %% Policy Function Approximation
+% Main program for running Policy Gradient Reinforcement Learning 
+% on KneedCompassGait robot model. See section three for main loop
 
 clear
 close all 
@@ -112,11 +114,6 @@ options.use_bullet = false;
 m = PlanarRigidBodyManipulator('KneedCompassGait_noankles.urdf', options);
 r = TimeSteppingRigidBodyManipulator(m,.001);
 
-% Setup visualizer - comment out for speed
-% v = r.constructVisualizer;
-% v.axis = [-1.7 5.2 -0.1 1.6];
-% v.display_dt = .05;
-
 % Set up global variables
 global state_targets;
 global current_target_state;
@@ -170,6 +167,7 @@ end
 
 % Begin reinforcement learning problem
 for k = 1:nepisodes
+    %% 
     
     % Update feedback control ratio
     alpha = alpha - 1/nepisodes;
@@ -189,7 +187,7 @@ for k = 1:nepisodes
     f = figure(1);
     plot(u_est')
     for i = 1:T
-        u_est_new(:,i) = policyRBF.evaluate(xtraj(states_used,i));
+        u_est_new(:,i) = policyRBF.evaluate(xtraj(states_used, i));
     end
     hold on 
     plot(u_est_new');
@@ -201,3 +199,4 @@ for k = 1:nepisodes
     % update expected control input based on updated policy
     u_est = u_est_new;
 end
+

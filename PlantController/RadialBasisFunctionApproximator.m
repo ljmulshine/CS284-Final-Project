@@ -1,5 +1,7 @@
+
 classdef RadialBasisFunctionApproximator
-    
+ % This class serves as the framework for radial basis function
+ % approximation
  properties
     weights
     phi
@@ -25,13 +27,14 @@ classdef RadialBasisFunctionApproximator
     % Compute the feature vector for a given state.
     %
     % @param s		the state in question.
-    % @return phi		a vector of doubles representing each basis function evaluated at s
+    % @return phi	a vector of doubles representing each basis function evaluated at s
     function features = computeFeatures(obj, s)
         a = repmat(s,1,obj.ncenters) - obj.centers;
         r2 = sum(a.*a, 1);
         features = exp(- r2 ./ (obj.width.^2));
     end
     
+    % Compute feature vectors for each state along trajectory x.
     function psi = getBasisFunctions(obj, x)
         % number of time points
         T = length(x(1,:));
