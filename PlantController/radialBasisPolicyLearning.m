@@ -1,37 +1,35 @@
+%% Policy Function Approximation
+
 clear
 close all 
-% 
-% % load trajectory data
-% load('xtraj2.mat');
-% load('utraj2.mat');
-% 
  
+% Time duration of trajectory
 T = 2001; 
-states = 1:14;
-% % Extract trajectories and control inputs
-% xtraj = xtraj2.eval(xtraj2.tt);
-% xtraj = xtraj(:,1:T);
-% u = utraj2(:,1:T);
 
+% use all 14 elements of the state space to approximate feedforward controller
+states_used = 1:14;
+
+% Load successful trajectory data
 load('good_xtrajs.mat');
 load('good_utrajs.mat');
-
-
-good_xtrajs = good_xtrajs(:,:,1:150); 
-good_utrajs = good_utrajs(:,:,1:150); 
+good_xtrajs = good_xtrajs(:,1:T,1:100); 
+good_utrajs = good_utrajs(:,1:T,1:100); 
 
 num_trajs = length(good_utrajs(1,1,:));
 
+% average over states and control inputs from successul trajectories
 xtraj = sum(good_xtrajs, 3) ./ num_trajs; 
 utraj = sum(good_utrajs, 3) ./ num_trajs;
 
-xtraj_training = reshape(good_xtrajs, 14, 2001 * num_trajs);
-utraj_training = reshape(good_utrajs, 4, 2001 * num_trajs);
+% Reshape training set used to initialize policy function approximator
+xtraj_training = reshape(good_xtrajs, 14, T * num_trajs);
+utraj_training = reshape(good_utrajs, 4, T * num_trajs);
 
+% Evaluate  diff on utraj to find very dynamic regions of trajectory around
+% which a high center density should exist
 u_diff = diff(utraj');
 figure()
 plot(u_diff);
-
 
 %  Define indices of centers used for RBF approximation
 t = [1:4:50, 51:10:110, ... 
@@ -44,13 +42,13 @@ t = [1:4:50, 51:10:110, ...
      1812:4:1930, 1931:10:2001 ];
 
 % Define the centers used for RBF approximation
-centers = xtraj(states,t);
+centers = xtraj(states_used,t);
 
 % Plot centers (overlay centers with original trajectory)
 figure()
 plot(t, centers');
 hold on
-plot(1:T, xtraj(states,:)');
+plot(1:T, xtraj(states_used,:)');
 
 % Number of basis functions
 nbasis_functions = length(t);
@@ -61,10 +59,10 @@ nactions = 4;
 policyRBF = PolicyGradientFA(nactions, centers, nbasis_functions);
 
 % Fit radial basis functions to initial trajectory
-policyRBF = policyRBF.fitFA(xtraj_training(states,:), utraj_training);
+policyRBF = policyRBF.fitFA(xtraj_training(states_used,:), utraj_training);
 
 for i = 1:T
-    u_est(:,i) = policyRBF.evaluate(xtraj(states,i));
+    u_est(:,i) = policyRBF.evaluate(xtraj(states_used,i));
 end
 
 figure()
@@ -103,7 +101,7 @@ subplot(4,1,4);
 plot(error(4,:));
 title('Error (right-knee-pin)');
 
-%% Policy Gradients
+%% Control Problem Initialization
 
 % Set up plant
 options = [];
@@ -143,28 +141,39 @@ state_targets = {
         [0; straight_knee; kick_ankle; max_hip_angle/2 - torso_lean; straight_knee; kick_ankle],... % right kick back
       };
 
-% 
-% % Evaluate fisher information matrix 
-% F = policyRBF.fisherInformation(policyRBF.linearFA{1}.phi, sigma);
-% F = F + eye(length(F(1,:))); % ensure F is well-conditioned
+% Initialize feedback control ration to 0.9
+alpha = 0.9;
 
-alpha = 0.90;
+% Number of learning episodes used
 nepisodes = 500;
+
+% Initialize data structure to hold episodic reward
 reward = zeros(1,nepisodes);
-baseline = zeros(1,T);
 
-%% Run RL 
+% initialize baseline value function to zero
+baseline = zeros(T,1);
 
+%% Policy Gradient Reinforcement Learning
+
+close all
+clear good_utrajs
+clear good_xtrajs
+clear utraj_training
+clear xtraj_training
+
+% Keep track of the previous policy sample's control torque magnitude
 global prev_action_norm;
-
 prev_action_norm = zeros(1,T);
-
 for i = 1:T
     prev_action_norm(i) = norm(u_est(:,i));
 end
+
+% Begin reinforcement learning problem
 for k = 1:nepisodes
     
-    alpha = alpha - 0.5*1/nepisodes;
+    % Update feedback control ratio
+    alpha = alpha - 1/nepisodes;
+    a(k) = alpha;
     
     % Estimate policy gradient
     [policyGradient, baseline, reward(k)] = policyRBF.policyGradient(u_est, r, baseline, T, alpha);
@@ -172,11 +181,15 @@ for k = 1:nepisodes
     % Update policy based on policy gradient estimate
     policyRBF = policyRBF.updatePolicy(policyGradient);
 
+    % Store current iteration parameters
+    parameters(:,k) = [policyRBF.linearFA{1}.weights; policyRBF.linearFA{2}.weights; 
+                       policyRBF.linearFA{3}.weights;  policyRBF.linearFA{4}.weights ];
+    
     % Plot approximator and previous control input
     f = figure(1);
     plot(u_est')
     for i = 1:T
-        u_est_new(:,i) = policyRBF.evaluate(xtraj(states,i));
+        u_est_new(:,i) = policyRBF.evaluate(xtraj(states_used,i));
     end
     hold on 
     plot(u_est_new');

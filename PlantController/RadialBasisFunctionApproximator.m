@@ -19,7 +19,7 @@ classdef RadialBasisFunctionApproximator
         obj.nstate_vars = nactions;
         obj.M = M;
         obj.ncenters = length(obj.centers(1,:));
-        obj.width = repmat(200, 1, obj.ncenters);
+        obj.width = repmat(20, 1, obj.ncenters);
     end
     
     % Compute the feature vector for a given state.
@@ -50,34 +50,7 @@ classdef RadialBasisFunctionApproximator
     function v = valueAt(obj,s) 
         v = obj.computeFeatures(s) * obj.weights;
     end
-   
-    % Set the value of this function approximator everywhere.
-    %
-    % @param v		the target value.
-    function obj = setValue(obj,v)
 
-    end
-    
-    % Add a weight delta vector to the function approximator's internal weights.
-    %
-    % @param w_delta	the vector to be added to the FA's weights
-    function obj = addToWeights(obj, w_delta)
-      obj.weights = obj.weights + obj.alpha_scale.*w_delta;
-    end
-    
-    %
-    % Set the function approximator's weight vector. 
-    %
-    % @param new_weights 	the new weight vector.
-    function obj = setWeights(obj, new_weights)
-      obj.weights = new_weights;
-    end
-    
-    function obj = resetWeights(obj)
-      obj = obj.setValue(0);
-    end   
-   
   end
-
 end
 

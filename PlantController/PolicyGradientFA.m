@@ -31,62 +31,30 @@ classdef PolicyGradientFA
                 % set weights
                 obj.linearFA{i}.weights = w;
             end
-        end
-        
+        end        
         
         % Evaluate function approximator at state x
         function u = evaluate(obj, s)
             for i = 1:obj.nactions
                 u(i,1) = obj.linearFA{i}.computeFeatures(s) * obj.linearFA{i}.weights;
             end
-        end
+        end    
 
-        % Approximate function given input state vector (trajectory), x
-        % 
-        function obj = approximate(obj, x)
-            % evaluate updated fourier basis approximator along trajectory to get
-            % estimate of feedforward control inputs
-            N = length(x(1,:));
-            obj.approximator = zeros(obj.nactions, N);
-            ClassName = class(obj);
-            fprintf('%s', ClassName);
-            if (strcmp(ClassName,'FourierPolicyApproximator'))
-                for j = 1:obj.nactions
-                    for i = 1:N
-                        obj.approximator(j,i) = obj.linearFA{j}.valueAt(x(:,i));
-                    end
-                end
-            else
-                for j = 1:obj.nactions
-                    obj.approximator(j,:) = obj.linearFA{j}.getBasisFunctions(x) * obj.linearFA{j}.weights;
-                end
-            end
-        end
-        
-
-        % Sample from multivariate normal policy given mean, mu
-        % and covariance, cov
-        function traj = samplePolicy(obj, mu, sigma)
-            % length of policy
-            N = length(mu);
-          
-            % sample from stochastic policy
-            traj = mvnrnd(mu, sigma)';
-        end
-
+        % evaluate the reward at each time step along trajectory, x
         function reward = reward(obj, x, a)
             
             global prev_action_norm
             
             reward = zeros(1,length(x(1,:)));
             for i = 1:length(x(1,:))
-                reward(i) = reward(i) + -100*(x(2,i)-1).^2 + 2;
+                reward(i) = reward(i) + -600*(x(2,i)-1).^2 + 4;
                 reward(i) = reward(i) + (1 - norm(a(:,i)) / prev_action_norm(i));
                 reward(i) = max(-2, reward(i));
                 prev_action_norm(i) = norm(a(:,i));
             end
         end
         
+        % Evaluate the return of current policy along trajectory, x
         function R_t = R_t(obj, x, policy)
             % Evaluate reward at each point along trajectory of length N
             N = length(x(1,:));
@@ -154,6 +122,7 @@ classdef PolicyGradientFA
                 traj = states;
                 policy = actions;
                 
+                % Display the current policy
                 figure(3) 
                 plot(policy');
                 
@@ -169,9 +138,10 @@ classdef PolicyGradientFA
                 % Evaluate advantage function at each point in time
                 A = R(:,i) - baseline;
                 
+                % Calculate policy gradient at each time step                
                 M = obj.linearFA{1}.M;
-                % Calculate policy gradient at each time step
                 for t = 1:T
+                    % Evaluate basis functions at current time step
                     phi = [ obj.linearFA{1}.computeFeatures(traj(:,t)), zeros(1,M), zeros(1,M), zeros(1,M);
                             zeros(1,M), obj.linearFA{2}.computeFeatures(traj(:,t)), zeros(1,M), zeros(1,M);
                             zeros(1,M), zeros(1,M), obj.linearFA{3}.computeFeatures(traj(:,t)), zeros(1,M);
@@ -183,15 +153,15 @@ classdef PolicyGradientFA
                 
             end
             
-            % Evaluate new baseline reward
+            % Update baseline reward approximation
             beta = 0.5;
             baseline = beta * baseline + (1 - beta) * sum(R,2) / N;
             
-            % Evaluate total reward
-            reward = sum(R(1,:)) / N;
-            
+            % Evaluate average total return of sampled trajectories
+            reward = sum(R(1,:)) / N;       
             fprintf("Reward: %f", reward);
-            % Average over N samples
+            
+            % Average policy gradient over N policy samples
             g = (1/(N*T))*sum(sum(g,2),3);
         end
         
