@@ -200,3 +200,9 @@ for k = 1:nepisodes
     u_est = u_est_new;
 end
 
+figure()
+plot(reward);
+title('Reward');
+xlabel('Episode #');
+ylabel('Reward');
+

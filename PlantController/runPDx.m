@@ -1,5 +1,10 @@
-function xtraj = runPDx(Kp,Kd,cv,cd,r,alpha, utraj, sigma)
-
+function [xtraj, ufb] = runPDx(Kp,Kd,cv,cd,r,alpha, utraj, sigma)
+    
+    % This function simulates KneedCompassGait model using SIMBICON-style
+    % controller with alpha-weighted feedback.
+    % @param utraj    feedforward function approximator handle
+    % @param sigma    covariance matrix between control actuator torques
+    % @param alpha    feedback weight 
     global state_targets;
     global current_target_state;
     global last_update_time;
@@ -36,11 +41,11 @@ function xtraj = runPDx(Kp,Kd,cv,cd,r,alpha, utraj, sigma)
     % % Find controller outputs corresonding to each time step - used to generate
     % % utraj for warm starting RL
     % current_target_state = 2;
-%     u = zeros(4,length(xtraj.tt));
-%     for i = 1:length(xtraj.tt)
-%         x = xtraj.xx(:,i);
-%         u(:,i) = c.output(xtraj.tt(i),0,x);
-%     end
+    u = zeros(4,length(xtraj.tt));
+    for i = 1:length(xtraj.tt)
+        x = xtraj.xx(:,i);
+        ufb(:,i) = c.getUfb(xtraj.tt(i),0,x);
+    end
 
     % zf = xtraj.xx(2,end); % for debugging
 

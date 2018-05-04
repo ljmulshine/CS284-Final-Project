@@ -40,7 +40,7 @@ classdef PolicyGradientFA
         end    
 
         % evaluate the reward at each time step along trajectory, x
-        function reward = reward(obj, x, a)
+        function reward = reward(obj, x, a, ufb)
             
             global prev_action_norm
             
@@ -54,12 +54,12 @@ classdef PolicyGradientFA
         end
         
         % Evaluate the return of current policy along trajectory, x
-        function R_t = R_t(obj, x, policy)
+        function R_t = R_t(obj, x, policy, ufb)
             % Evaluate reward at each point along trajectory of length N
             N = length(x(1,:));
             for i = 1:N
                 % Calculate reward given current state and action
-                reward(i) = obj.reward(x(:,i), policy(:,i));
+                reward(i) = obj.reward(x(:,i), policy(:,i), ufb(:,i));
             end
 
             gamma = 0.9999;
@@ -113,7 +113,7 @@ classdef PolicyGradientFA
             % estimate policy gradient
             for i = 1:N
                 % Simulate policy and get trajectory
-                runPDx(Kp,Kd,cv,cd,r,alpha,@obj.evaluate, sigma);
+                [~, ufb] = runPDx(Kp,Kd,cv,cd,r,alpha,@obj.evaluate, sigma);
                
                 % Update states and actions for current policy sample
                 sampled_traj(:,:,i) = states;
@@ -131,7 +131,7 @@ classdef PolicyGradientFA
 %                 title('Base Height');
 
                 % Evaluate "return" from sampled trajectory
-                R(:,i) = obj.R_t(traj, policy);
+                R(:,i) = obj.R_t(traj, policy, ufb);
                 
                 fprintf("\nCurrent trajectory's reward: %f\n", R(1,i));
                 % Evaluate advantage function at each point in time

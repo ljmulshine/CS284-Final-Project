@@ -13,6 +13,7 @@ classdef PDController < DrakeSystem
     use_lqr % set to false as it is not linearizable
     utraj % controller outputs to be commanded
     sigma
+    ufb
   end
 
   methods
@@ -40,6 +41,8 @@ classdef PDController < DrakeSystem
         % alpha = 1 --> only FB; alpha = 0 --> only FF
         obj.alpha = alpha;
         obj.sigma = sigma;
+        
+        obj.ufb = [];
         
         if exist('utraj', 'var')
             obj.utraj = utraj;
@@ -133,6 +136,27 @@ classdef PDController < DrakeSystem
         % Threshold controller outputs - these limits were chosen somewhat randomly
         u = min(u,200);
         u = max(u,-200);
+    end
+    
+    
+    function ufb = getUfb(obj,t,~,x)
+        global current_target_state
+        global last_update_time
+        global actions
+        
+        % Update target pose if necessary
+        y = obj.updateState(t,[current_target_state; last_update_time],x);
+        current_target_state = y(1);
+        
+        obj.qdes = obj.getState(current_target_state,x);
+        
+        % PD controller output
+        ufb = -obj.Kp*(x(1:obj.q_num)-obj.qdes(1:obj.q_num))-obj.Kd*x(obj.q_num+1:obj.q_num+obj.qdot_num);        
+        ufb = obj.alpha*ufb;
+
+        % Threshold controller outputs - these limits were chosen somewhat randomly
+        ufb = min(ufb,200);
+        ufb = max(ufb,-200);
     end
     
     function obj = setU(obj,utraj_new)
