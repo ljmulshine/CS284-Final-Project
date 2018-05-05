@@ -24,7 +24,8 @@ classdef RadialBasisFunctionApproximator
         obj.width = repmat(20, 1, obj.ncenters);
     end
     
-    % Compute the feature vector for a given state.
+    % Compute the feature vector for a given state using Gaussian Radial
+    % Basis functions
     %
     % @param s		the state in question.
     % @return phi	a vector of doubles representing each basis function evaluated at s

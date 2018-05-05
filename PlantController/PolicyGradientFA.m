@@ -19,8 +19,10 @@ classdef PolicyGradientFA
             
         % Fit the function approximator to trajectory (x, u)
         function obj = fitFA(obj, x, u, t)
+            
             % Compute basis features for each state along the trajectory
             for i = 1:obj.nactions
+                
                 features = obj.linearFA{i}.getBasisFunctions(x);
                 obj.linearFA{i}.phi = features;
                 
@@ -81,6 +83,8 @@ classdef PolicyGradientFA
         %  @param   s       trajectory
         function [g, baseline, reward] = policyGradient(obj, u_est, r, baseline, T, alpha)
             
+            % Global state and action variables updated by PDController 
+            % after simulation on KneedCompassGait model
             global states
             global actions
             
@@ -103,9 +107,12 @@ classdef PolicyGradientFA
             Kp = 170; % 170 is a good value for just FB
             Kd = 2*sqrt(Kp);
             cv = 0.1; % 0.1 is a good value for just FB
-            cd = 0;                
+            cd = 0;
+            
+            % Exploration factor used to generate policy samples
             xFactor = 1;
             sigma = xFactor * eye(4);
+            
             % Calculate inverse covariance
             iS = inv(sigma);
             
@@ -149,6 +156,7 @@ classdef PolicyGradientFA
 
                     % Evaluate policy gradient
                     g(:,t, i) = phi' * iS * (actions(:,t) - obj.evaluate(traj(:,t))).*A(t);
+                    
                 end 
                 
             end
@@ -175,6 +183,7 @@ classdef PolicyGradientFA
             for i = 1:obj.nactions
                 obj.linearFA{i}.weights = obj.linearFA{i}.weights + del(:,i);
             end
+            
         end
         
     end
