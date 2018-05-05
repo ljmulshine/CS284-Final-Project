@@ -121,14 +121,14 @@ classdef PolicyGradientFA
                 traj = states;
                 policy = actions;
                 
-%                 % Display the current policy
-%                 figure(3) 
-%                 plot(policy');
+                % Display the current policy
+                figure(3) 
+                plot(policy');
                 
-%                 % Plot base height over time - demonstrates policy
-%                 figure(2)
-%                 plot(traj(2,:));
-%                 title('Base Height');
+                % Plot base height over time - demonstrates policy
+                figure(2)
+                plot(traj(2,:));
+                title('Base Height');
 
                 % Evaluate "return" from sampled trajectory
                 R(:,i) = obj.R_t(traj, policy, ufb);
@@ -140,6 +140,7 @@ classdef PolicyGradientFA
                 % Calculate policy gradient at each time step                
                 M = obj.linearFA{1}.M;
                 for t = 1:T
+                    
                     % Evaluate basis functions at current time step
                     phi = [ obj.linearFA{1}.computeFeatures(traj(:,t)), zeros(1,M), zeros(1,M), zeros(1,M);
                             zeros(1,M), obj.linearFA{2}.computeFeatures(traj(:,t)), zeros(1,M), zeros(1,M);
@@ -166,9 +167,11 @@ classdef PolicyGradientFA
         
         % Update the policy based on policy gradient in current iteration
         function obj = updatePolicy(obj, g)
-            alpha = 0.0005;
+            
+            % gradient ascent step size
+            gamma = 0.0005;
             % update FA parameters based on policy gradient
-            del = reshape(alpha * g, obj.linearFA{1}.M, 4);
+            del = reshape(gamma * g, obj.linearFA{1}.M, 4);
             for i = 1:obj.nactions
                 obj.linearFA{i}.weights = obj.linearFA{i}.weights + del(:,i);
             end
